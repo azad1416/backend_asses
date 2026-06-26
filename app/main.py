@@ -1,8 +1,11 @@
 import logging
 import time
+from contextlib import asynccontextmanager
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+from alembic import command
+from alembic.config import Config
 from fastapi import Depends, FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,12 +39,32 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+
+def run_migrations() -> None:
+    base_dir = Path(__file__).resolve().parent.parent
+    alembic_ini = base_dir / "alembic.ini"
+    if not alembic_ini.exists():
+        logger.warning("alembic.ini not found at %s — skipping migrations", alembic_ini)
+        return
+    logger.info("Running database migrations...")
+    alembic_cfg = Config(str(alembic_ini))
+    command.upgrade(alembic_cfg, "head")
+    logger.info("Database migrations completed")
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    run_migrations()
+    yield
+
+
 app = FastAPI(
     title=settings.app_name,
     description="Production-ready Inventory & Order Management System API",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
