@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: inventory-backend
+    runtime: python
+    rootDir: inventory-backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: inventory-db
+          property: connectionString
+      - key: APP_NAME
+        value: Inventory Management System
+      - key: DEBUG
+        value: "false"
+      - key: ALLOWED_ORIGINS
+        value: https://your-frontend.onrender.com,http://localhost:3000
+      - key: LOW_STOCK_THRESHOLD
+        value: "10"
+
+databases:
+  - name: inventory-db
+    plan: free

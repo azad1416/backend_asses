@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,6 +16,15 @@ class Settings(BaseSettings):
     debug: bool = False
     allowed_origins: str = "http://localhost:3000,http://localhost:8000"
     low_stock_threshold: int = 10
+
+    @field_validator("database_url")
+    @classmethod
+    def normalize_database_url(cls, value: str) -> str:
+        # Managed hosts (Render, Heroku) often expose a "postgres://" URL, but
+        # SQLAlchemy 2.0 requires the "postgresql://" dialect scheme.
+        if value.startswith("postgres://"):
+            return value.replace("postgres://", "postgresql://", 1)
+        return value
 
     @property
     def origins_list(self) -> list[str]:

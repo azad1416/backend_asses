@@ -3,14 +3,17 @@ import time
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from fastapi import FastAPI, Request, status
+from fastapi import Depends, FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
 from app.api import customers, dashboard, orders, products
 from app.core.config import get_settings
+from app.core.database import get_db
 from app.utils.exceptions import AppException, ErrorResponse
 
 settings = get_settings()
@@ -115,5 +118,18 @@ app.include_router(dashboard.router, prefix="/api")
 
 
 @app.get("/health", tags=["Health"])
-def health_check():
-    return {"status": "healthy", "app": settings.app_name}
+def health_check(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("SELECT 1"))
+        return {"status": "healthy", "app": settings.app_name, "database": "connected"}
+    except Exception as exc:
+        logger.error("Health check database error: %s", exc)
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={
+                "status": "unhealthy",
+                "app": settings.app_name,
+                "database": "disconnected",
+                "message": str(exc),
+            },
+        )
